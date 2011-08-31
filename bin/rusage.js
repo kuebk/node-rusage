@@ -31,18 +31,14 @@ exports.start = function(){
 		key = defaultKey;
 	}
 
-	var usage = rusage.cycles();
-
-	if(typeof usage == "undefined"){
-		return -1;
-	}
+	usage = rusage.cycles();
 
 	labels[key] = usage;
 	return labels[key];
 };
 
 exports.stop = function(){
-	var key;
+	var key, usage;
 
 	if(arguments[0]){
 		key = arguments[0];
@@ -50,7 +46,18 @@ exports.stop = function(){
 		key = defaultKey;
 	}
 
-	return rusage.cycles() - labels[key];
+	usage = rusage.cycles();
+
+	if(usage == null || labels[key] == null || !labels.hasOwnProperty(key)){
+		return -1;
+	}
+
+	return usage - labels[key];
 };
 
 exports.usage = rusage.get;
+exports.who = rusage.who;
+
+//constants
+exports.RUSAGE_SELF = rusage.RUSAGE_SELF;
+exports.RUSAGE_CHILDREN = rusage.RUSAGE_CHILDREN;

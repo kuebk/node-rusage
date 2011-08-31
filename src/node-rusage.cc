@@ -25,26 +25,37 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
-int who = 0;
+int globalWho = RUSAGE_SELF;
 
 static v8::Handle<v8::Value> get_r_usage(const v8::Arguments& args){
 	v8::HandleScope scope;
 
+	int localWho = globalWho;
+
 	if(args.Length() != 0){
+		bool isError = false;
 		if(args[0]->IsNumber()){
 			v8::Local<v8::Integer> iWho = v8::Local<v8::Integer>::Cast(args[0]);
-			who = (int)(iWho->Int32Value());
+			localWho = (int)(iWho->Int32Value());
+
+			if(localWho != RUSAGE_SELF && localWho != RUSAGE_CHILDREN){
+				isError = true;
+			}
 		}else{
-			return v8::ThrowException(v8::Exception::TypeError(v8::String::New("First argument must be a number")));
+			isError = true;
+		}
+
+		if(isError){
+			return v8::ThrowException(v8::Exception::TypeError(v8::String::New("First argument must be either a RUSAGE_SELF or RUSAGE_CHILDREN")));
 		}
 	}
 
 	rusage rusagedata;
 
-	int status = getrusage(who, &rusagedata);
+	int status = getrusage(localWho, &rusagedata);
 
 	if(status != 0){
-		scope.Close(v8::Undefined());
+		scope.Close(v8::Null());
 	}
 
 	v8::Local<v8::Object> data = v8::Object::New();
@@ -78,13 +89,33 @@ static v8::Handle<v8::Value> usage_cycles(const v8::Arguments& args){
 
 	rusage rusagedata;
 
-	int status = getrusage(who, &rusagedata);
+	int status = getrusage(globalWho, &rusagedata);
 
 	if(status != 0){
-		return scope.Close(v8::Undefined());
+		return scope.Close(v8::Null());
 	}
 
 	return scope.Close(v8::Number::New(rusagedata.ru_utime.tv_sec * 1e6 + rusagedata.ru_utime.tv_usec));
+}
+
+static v8::Handle<v8::Value> who(const v8::Arguments& args){
+	v8::HandleScope scope;
+
+	if(args.Length() != 0 && args[0]->IsNumber()){
+		v8::Local<v8::Integer> iWho = v8::Local<v8::Integer>::Cast(args[0]);
+		int localWho = (int)(iWho->Int32Value());
+
+		if(localWho != RUSAGE_SELF && localWho != RUSAGE_CHILDREN){
+			return v8::ThrowException(v8::Exception::TypeError(v8::String::New("First argument must be either a RUSAGE_SELF or RUSAGE_CHILDREN")));
+		}
+
+		globalWho = localWho;
+
+		return scope.Close(v8::True());
+	}else{
+		return scope.Close(v8::False());
+	}
+
 }
 
 extern "C" void init (v8::Handle<v8::Object> target){
@@ -92,5 +123,9 @@ extern "C" void init (v8::Handle<v8::Object> target){
 
 	NODE_SET_METHOD(target, "get", get_r_usage);
 	NODE_SET_METHOD(target, "cycles", usage_cycles);
+	NODE_SET_METHOD(target, "who", who);
+
+	target->Set(v8::String::New("RUSAGE_SELF"), v8::Number::New(RUSAGE_SELF));
+	target->Set(v8::String::New("RUSAGE_CHILDREN"), v8::Number::New(RUSAGE_CHILDREN));
 }
 

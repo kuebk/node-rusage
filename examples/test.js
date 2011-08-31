@@ -21,7 +21,7 @@
  */
 
 var rusage = require('../bin/rusage.js'), xx = [];
-
+rusage.who(rusage.RUSAGE_SELF);
 console.log('usage data:', rusage.usage());
 
 rusage.start("www");
